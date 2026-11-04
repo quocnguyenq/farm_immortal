@@ -38,8 +38,15 @@ async function removeWhite(file) {
   }
   // Loang từ viền ảnh qua nền trắng + bóng đổ xám/ngả màu nhạt; chi tiết trắng
   // bên trong vật thể được bao bởi phần có màu nên không bị thủng.
+  // Quầng kem dính nền trắng (cá rồng): R≈G cao, B thấp hơn một chút.
+  // Hồng sen (G≈B) và vàng lúa (R≫G hoặc B thấp) không lọt.
+  const warmGlow = (i) => {
+    const o = i * 4;
+    const r = data[o], g = data[o + 1], b = data[o + 2];
+    return r >= 220 && g >= 150 && b >= 125 && r - g <= 45 && g - b >= 12 && g - b <= 100 && r - b >= 30;
+  };
   const passable = (i) =>
-    dist[i] < 30 || (sat[i] < 20 && dist[i] < 150) || (sat[i] < 40 && dist[i] < 80);
+    dist[i] < 30 || (sat[i] < 20 && dist[i] < 150) || (sat[i] < 40 && dist[i] < 80) || warmGlow(i);
   const bg = new Uint8Array(N);
   const stack = [];
   const push = (i) => {
@@ -58,17 +65,17 @@ async function removeWhite(file) {
   // Khe nền trắng thuần bị bao kín (vd. giữa bụi lúa) — vùng đủ lớn thì coi là nền.
   const seen = new Uint8Array(N);
   for (let s = 0; s < N; s++) {
-    if (bg[s] || seen[s] || dist[s] >= 5) continue;
+    if (bg[s] || seen[s] || dist[s] >= 12 || sat[s] >= 16) continue;
     const comp = [s];
     seen[s] = 1;
     for (let k = 0; k < comp.length; k++) {
       const i = comp[k];
       const x = i % W, y = (i / W) | 0;
       for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1]) {
-        if (j >= 0 && !seen[j] && !bg[j] && dist[j] < 5) { seen[j] = 1; comp.push(j); }
+        if (j >= 0 && !seen[j] && !bg[j] && dist[j] < 12 && sat[j] < 16) { seen[j] = 1; comp.push(j); }
       }
     }
-    if (comp.length >= 250) for (const i of comp) bg[i] = 1;
+    if (comp.length >= 40) for (const i of comp) bg[i] = 1;
   }
   // Viền răng cưa sáng màu giữa vật thể và nền cũng xử lý như nền (alpha mềm).
   const edge = new Uint8Array(N);
@@ -87,6 +94,8 @@ async function removeWhite(file) {
   for (let i = 0; i < N; i++) {
     const o = i * 4;
     if (bg[i]) {
+      // Quầng kem xóa hẳn; bóng xám tiếp xúc đất vẫn giữ alpha mềm.
+      if (warmGlow(i) || Math.min(data[o], data[o + 1], data[o + 2]) >= 176) { data[o + 3] = 0; continue; }
       const a = Math.min(0.55, smooth(5, 160, dist[i]) * 0.9);
       if (a <= 0.015) { data[o + 3] = 0; continue; }
       unmix(o, a);

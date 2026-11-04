@@ -76,5 +76,7 @@ Gọi `CallDynamicTool` với namespace `cursor`, toolName `GenerateImage` (xem 
 ## Sự cố thường gặp
 - **Hai cột dính nhau hoặc tách sai số lượng:** generate lại với "wider gaps", script mới chia đúng.
 - **Mảng trắng kẹt bên trong (bóng ngả xanh):** chỉnh `passable` trong `removeWhite`.
-  - Đừng tăng ngưỡng vùng trắng kín (`dist < 5`) lên 16: làm vậy sẽ ăn mất cánh hoa trắng (dâu).
+  - Khe trắng kín giữa lá/bông đã xóa khi `dist < 12`, `sat < 16` và vùng ≥ 40px.
+  - Đừng nới `dist` lên 16 bỏ điều kiện `sat`: làm vậy sẽ ăn mất cánh hoa trắng (dâu).
+  - Quầng kem của cá rồng xóa bằng `warmGlow` (R cao, G gần R, B thấp hơn). Đừng nới thành mọi màu sáng, kẻo mất cánh sen.
 - **Ảnh sinh có nền xám/be:** generate lại và nhấn mạnh "pure solid white #FFFFFF background".
