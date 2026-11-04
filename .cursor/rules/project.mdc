@@ -1,0 +1,104 @@
+---
+description: Bối cảnh dự án, kiến trúc, cơ chế game, quy ước code và checklist — Nông Trại Tiên Duyên
+alwaysApply: true
+---
+
+# Nông Trại Tiên Duyên — bối cảnh cho mọi model
+
+Rule này để bất kỳ model nào (Claude, Grok, GPT, Gemini...) tiếp tục dự án mà không cần lịch sử chat. Đọc hết trước khi sửa code. Art: xem thêm `art-style.mdc`.
+
+## Sản phẩm
+- Game nông trại web kiểu "Nông Trại Vui Vẻ" (Zingme), sau này thêm tu tiên.
+- Người chơi ở `/play`; admin cấu hình mọi số liệu ở `/admin`.
+- UI tiếng Việt có dấu. Người dùng là Quốc (designer/dev), trao đổi bằng tiếng Việt.
+
+## Stack & lệnh
+- **Next.js 16.4.5** (App Router, Turbopack, thư mục `src/`), React 19.3, Tailwind v4, TypeScript.
+  - API Next bản này khác dữ liệu huấn luyện: đọc `node_modules/next/dist/docs/` trước khi dùng API Next lạ.
+  - `src/middleware.ts` bảo vệ `/play` và `/admin`.
+- **Prisma 6.16.x** (giữ major 6) với Postgres local, DB `farming_immortality_cultivation`.
+  - `.env` chứa `DATABASE_URL` và `JWT_SECRET`; mẫu ở `.env.example`. Không commit `.env`.
+- **Auth:** JWT (jose) trong cookie `farm_session`, mật khẩu băm bcryptjs.
+  - Tài khoản seed: `admin` / `12345678`, `nongdan` / `123456`.
+- **Lệnh:**
+  - `npm run dev` → http://localhost:3000
+  - `npm run db:push`, `npm run db:seed`
+  - Kiểm tra: `npx tsc --noEmit`, `npx eslint <files>`
+  - Art: `node scripts/process-assets.mjs`
+
+## Bản đồ code
+| Đường dẫn | Vai trò |
+|---|---|
+| `prisma/schema.prisma`, `prisma/seed.ts` | Model và số liệu mặc định: cây, phân, tỷ lệ sao, ô, cá, cấp ao, GameConfig |
+| `src/lib/game.ts` | Cây/ô: `processUserPlots` (tăng trưởng lazy), `rollQuality`, `sellPriceFor`, `addXp`, `formatMs`, `qualityLabel` |
+| `src/lib/pond.ts` | Cá/ao, chỉ chạy server: `getPondState`, `fishStageAt`, `fishOdds`, `rollFromOdds` |
+| `src/lib/fishText.ts` | Nhãn, tỷ lệ kích thước cá; an toàn để dùng ở client |
+| `src/lib/types.ts` | `FarmState`, dữ liệu `/api/farm` trả về |
+| `src/lib/{cropArt,fishArt,propArt}.json` | Manifest art do script sinh. **Không sửa tay.** |
+| `src/app/api/farm/*` | plant, water, fertilize, harvest, unlock; GET `/api/farm` trả toàn bộ state |
+| `src/app/api/pond/*`, `api/shop/*` | Mua/thu/nâng ao; mua hạt, bán nông sản và cá |
+| `src/app/api/admin/*` | CRUD cấu hình cho trang admin |
+| `src/app/play/page.tsx` | State game, menu thao tác theo ngữ cảnh, modal (Kho/Chợ/Ao) |
+| `src/app/admin/page.tsx` | Các tab cấu hình: cây, phân, ô, tỷ lệ, cá, ao cá, config |
+| `src/components/FarmScene.tsx` | World 2400×1400, camera kéo/zoom, đặt nhà, ao, ruộng |
+| `src/components/FarmField.tsx` | Ruộng isometric bằng SVG (texture pattern) |
+| `src/components/CropSprite.tsx` | Ảnh cây phủ lên ô |
+| `src/components/FarmPond.tsx` | Ao, cá bơi (rAF), biển ao |
+| `src/components/ActionMenu.tsx`, `ActionIcons.tsx` | Popup thao tác và icon |
+| `src/components/Modals.tsx` | Kho, Chợ, Ao cá, Toast |
+| `scripts/process-assets.mjs`, `art-src/` | Pipeline art và ảnh nguồn |
+
+## Cơ chế game (giữ nguyên trừ khi được yêu cầu)
+- **Cây:**
+  - 4 giai đoạn `SEED → SPROUT → GROW → RIPE`, thời gian từng giai đoạn cấu hình theo cây.
+  - Cây chỉ lớn khi đất còn nước. Tưới đặt lại 6 giờ (GameConfig `waterDurationMs`).
+  - Tăng trưởng tính lazy trong `processUserPlots`; route nào đụng tới ô phải gọi hàm này trước.
+- **Phân bón:** 4 cấp, mỗi giai đoạn bón 1 lần (`fertilizedThisStage`), giảm % thời gian giai đoạn, trả bằng vàng.
+- **Chất lượng:** 0–5★ và Thượng cấp (`PREMIUM`), lấy theo bảng `QualityRate` (đơn vị bps). Giá bán theo `sellStar0..5` / `sellPremium`.
+- **Ô đất:** 24 ô, mở theo `PlotUnlock` (cấp + vàng), mở hết quanh cấp 100.
+- **Cá:**
+  - Giai đoạn `FRY → SMALL → ADULT` theo `durationFryMs` / `durationSmallMs`.
+  - Sau khi trưởng thành, cá hấp thu linh khí `aging` từ 0 đến 1 trong `agingMaxMs`.
+  - Tỷ lệ chất lượng = weight × e^(strength·aging·i), với i là chỉ số chất lượng 0..6 và strength = GameConfig `fishAgingStrength`.
+- **Ao:** `PondLevel` 1..25, sức chứa = cấp, `requiredLevel` = 5·(cấp−1), cấp ao cuối cần nhân vật cấp 120.
+- **Số liệu cân bằng:** mọi số liệu ở DB (seed + admin), không hard-code trong UI. Thêm cấu hình mới thì sửa cả schema, seed, API admin và tab admin.
+
+## UI / scene
+- **Không có toolbar.** Thao tác gắn trực tiếp vào vật thể:
+  - Bấm vào vật thể sẽ mở `ActionMenu` ngay tại vị trí click.
+  - Menu của ô đất đổi theo trạng thái: khóa → mở ô; trống → chọn hạt; đang lớn → tưới, và bón phân nếu chưa bón; chín → thu hoạch. Logic nằm ở `renderPlotMenu` trong `play/page.tsx`.
+  - Thêm vật thể tương tác mới thì theo cùng pattern: component gọi `onX(item, { x: e.clientX, y: e.clientY })`, page set state `menu` rồi render `ActionMenu` với các `MenuButton`.
+- **Toạ độ:**
+  - Ruộng isometric 6×4 ô. Tâm ô: x = 500 + (c−r)·96, y = 56 + (c+r+1)·54 trong khung FIELD (đặt tại world 350,170).
+  - Mỗi ô rộng 192×108px. Vị trí nhà/ao lấy từ hằng `HOUSE`, `POND_POS` trong `FarmScene`.
+- **Kéo camera:**
+  - Phần tử bấm được trong world phải bỏ qua click sau khi kéo (`dragRef.current?.moved`).
+  - Overlay UI gắn `data-ui` để không kích hoạt kéo camera.
+  - Container lớn trong suốt dùng `pointer-events-none`; chỉ vùng bấm thật mới nhận chuột.
+- **Animation:**
+  - Dùng `requestAnimationFrame` và ghi thẳng `style.transform` qua ref; không setState mỗi frame.
+  - Cá tách 3 đoạn đầu/thân/đuôi (clip-path) uốn `skewY` lệch pha, tốc độ có quán tính.
+  - Kiểu bơi lấy theo `swimStyle` trong map `STYLES` (`FarmPond.tsx`); danh sách phải khớp `SWIM_STYLES` ở admin.
+
+## Quy ước code & bẫy môi trường (Windows)
+- Sửa file **chỉ bằng công cụ edit/write của agent**. KHÔNG dùng PowerShell `Get-Content | Set-Content` hay `-replace` để sửa file: cách này từng làm rỗng file và hỏng UTF-8 tiếng Việt.
+- Shell là PowerShell: nối lệnh bằng `;`, không dùng `&&`.
+- **Đổi schema Prisma:**
+  1. Dừng dev server trước, vì `prisma generate` lỗi khóa DLL trên Windows.
+  2. Chạy `npm run db:push`.
+  3. Cập nhật `seed.ts`.
+- Code dùng prisma (`src/lib/game.ts`, `pond.ts`) không import vào client component. Hàm/type cho client tách file riêng (ví dụ `fishText.ts`).
+- **Lint React hooks (strict):**
+  - Không gọi `Date.now()` / `performance.now()` khi render; dùng `useState(() => Date.now())`.
+  - Không setState đồng bộ trong thân effect.
+  - Không ghi `ref.current` khi render.
+- Comment ngắn, tiếng Việt, chỉ để giải thích ràng buộc không hiển nhiên; giữ mật độ comment như code xung quanh.
+
+## Checklist trước khi báo xong
+1. `npx tsc --noEmit` sạch; `npx eslint` các file đã sửa không còn lỗi.
+2. `npm run dev`, mở `/play` (đăng nhập `nongdan`), thao tác thật trên trình duyệt và chụp màn hình kiểm tra.
+3. Có art mới: làm đủ các bước trong `art-style.mdc`.
+4. Git:
+   - Repo https://github.com/quocnguyenq/farm_immortal, branch `main`; tên/email commit đã cấu hình local cho repo.
+   - Không commit `.env`.
+   - Không lưu token vào remote URL hay git config.

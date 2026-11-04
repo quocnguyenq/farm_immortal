@@ -5,7 +5,7 @@ import sharp from "sharp";
 import fs from "node:fs";
 import path from "node:path";
 
-const SRC = process.argv[2] ?? "C:/Users/SHONDO/.cursor/projects/d-Game/assets";
+const SRC = process.argv[2] ?? "art-src";
 const STAGES = ["seed", "sprout", "grow", "ripe"];
 const CROPS = [
   "rice", "wheat", "carrot", "tomato", "corn", "potato", "cabbage", "chili",

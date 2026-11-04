@@ -1,30 +1,80 @@
 ---
-description: Phong cách và quy trình art AI-generate cho Nông Trại Tiên Duyên (3D thực tế, isometric)
+description: Phong cách và quy trình art AI-generate cho Nông Trại Tiên Duyên (3D thực tế, isometric) — áp dụng cho mọi model
 alwaysApply: true
 ---
 
 # Art style — Nông Trại Tiên Duyên
 
-Mọi hình ảnh mới (cây, cá, vật nuôi, nhà, công trình, đồ trang trí, item) phải giữ đúng phong cách hiện có. Không dùng SVG cartoon hay emoji thay cho art trong cảnh game.
+Mọi hình ảnh mới (cây, cá, vật nuôi, nhà, công trình, đồ trang trí, item) phải giữ đúng phong cách hiện có.
+- Không dùng SVG cartoon hay emoji thay cho art trong cảnh game.
+- Icon nút trong menu UI (`ActionIcons.tsx`) là ngoại lệ, được dùng SVG.
+- Nếu model hiện tại không có tool `GenerateImage`: báo người dùng, không tự vẽ thay.
 
 ## Phong cách bắt buộc
 - Render 3D thực tế (photorealistic), chi tiết cao, ánh sáng ban ngày mềm chiếu từ **trên-trái**.
-- Góc nhìn **isometric 3/4 cao ~30°**, cùng góc với khu ruộng (ô đất 192×108px, tỷ lệ 16:9). Công trình thấy 2 mặt trước-trái và trước-phải.
-- Khối nền (ruộng, ao, chuồng...) là **khối đất cắt** giống ao/ruộng: mặt trên có cỏ/đất, mặt trước lộ thành đất.
-- Khi gọi GenerateImage, luôn kèm ảnh mẫu: `assets/plant-rice.jpg` (style) và ảnh chụp game hoặc `assets/prop-pond.jpg` (góc nhìn).
+- Góc nhìn **isometric 3/4 cao ~30°**, cùng góc với khu ruộng (ô đất 192×108px, tỷ lệ 16:9). Công trình thấy 2 mặt: trước-trái và trước-phải.
+- Ao, hồ, mặt nước **lún xuống mặt cỏ**, không có tường đất. Chỉ ruộng là khối đất cắt.
+- Cá/vật nuôi: nhìn ngang, **quay đầu sang PHẢI**, không bóng (game tự đổ bóng và lật hướng).
 
-## Quy ước ảnh nguồn (lưu ở `C:/Users/SHONDO/.cursor/projects/d-Game/assets/`)
-- **Nền trắng thuần `#FFFFFF`**, không chữ, không mặt đất phụ (trừ công trình có đế cỏ).
-- Nhiều trạng thái của 1 vật → **1 dải ngang, các cột bằng nhau, khoảng trống rộng** giữa cột:
-  - Cây: `plant-{key}.jpg`, 4 cột: hạt → non → phát triển → chín, khung 16:9.
-  - Cá/vật nuôi: `fish-*.jpg`, 5 con/dải, nhìn ngang **quay đầu sang PHẢI**, không bóng.
-- Công trình đơn: `prop-{key}.jpg`.
-- Texture lát gạch: nhìn thẳng từ trên, seamless, kín khung vuông: `tex-{key}.jpg`.
+## Ảnh mẫu (bắt buộc đính kèm khi gọi GenerateImage)
+Ảnh nguồn nằm trong repo, thư mục `art-src/`. Đường dẫn tuyệt đối: `d:/Game/art-src/...`.
+- **Style 3D:** `art-src/plant-rice.jpg`, dùng cho mọi loại.
+- **Góc nhìn cảnh:** `art-src/ref-scene.png`, ảnh chụp game hiện tại.
+- **Theo loại:** công trình dùng `art-src/prop-house.jpg`; mặt nước dùng `art-src/prop-pond.jpg`; cá dùng `art-src/fish-a.jpg`.
+
+## Gọi tool
+Gọi `CallDynamicTool` với namespace `cursor`, toolName `GenerateImage` (xem schema bằng `GetDynamicTools` trước). Tham số:
+- `description`: prompt tiếng Anh theo mẫu bên dưới.
+- `filename`: theo quy ước tên file bên dưới.
+- `aspect_ratio`: `"16:9"` cho dải nhiều cột, công trình; `"1:1"` cho texture.
+- `reference_image_paths`: đường dẫn tuyệt đối tới các ảnh mẫu ở trên.
+
+Ảnh sinh ra được lưu ở thư mục mà tool báo về (thường là `C:/Users/SHONDO/.cursor/projects/d-Game/assets/`, đuôi `.jpg`). **Chép sang `art-src/` với đúng tên** rồi mới xử lý.
+
+## Quy ước ảnh nguồn (`art-src/`)
+- **Nền trắng thuần `#FFFFFF`**, không chữ, không mặt đất phụ.
+- Nhiều trạng thái của 1 vật: **1 dải ngang, các cột bằng nhau, khoảng trống rộng giữa các cột.**
+
+| Loại | Tên file | Bố cục |
+|---|---|---|
+| Cây trồng | `plant-{key}.jpg` | 4 cột: hạt → non → phát triển → chín, khung 16:9 |
+| Cá | `fish-{a,b,c...}.jpg` | 5 con/dải, quay phải, cùng chiều dài |
+| Công trình | `prop-{key}.jpg` | 1 vật thể giữa khung |
+| Texture | `tex-{key}.jpg` | Nhìn thẳng từ trên, seamless, kín khung vuông |
+
+## Prompt mẫu đã cho kết quả tốt (thay phần trong `<>`)
+**Cây:**
+> Same layout and style as the reference: four photorealistic 3D `<crop>` plants in four equal columns left to right with wide gaps, slightly elevated 3/4 view, small contact shadow each. Column 1: `<hạt trên mặt đất>`. Column 2: `<mầm non>`. Column 3: `<cây đang lớn>`. Column 4: `<cây chín, quả/hạt rõ>`. No soil bed, pure solid white #FFFFFF background, no text.
+
+**Cá:**
+> Five photorealistic 3D freshwater fish in the same realistic render style and lighting as the reference, each shown in full side profile facing RIGHT, arranged left to right in five equal columns with wide empty gaps, all roughly the same length, no shadows. Column 1: `<loài, màu, đặc điểm>`. … Column 5: `<…>`. Pure solid white #FFFFFF background, no water, no text.
+
+**Công trình** (kèm `ref-scene.png` và `plant-rice.jpg`):
+> A single photorealistic 3D `<công trình>`, viewed from the same isometric 3/4 high angle (about 30 degrees) as the farm field in the first reference image, front-left and front-right walls visible. `<vật liệu, chi tiết>`, a small patch of grass base under it with a soft contact shadow. Soft warm daylight from the top-left, high detail, same realistic render style as the plants in the second reference. Isolated object, pure solid white #FFFFFF background everywhere around it, no text.
+
+**Mặt nước** (kèm `prop-pond.jpg` và `ref-scene.png`):
+> Photorealistic 3D natural `<ao/hồ>` dug INTO flat grassy ground, same isometric 3/4 high angle (about 30 degrees) and same render style as the first reference. NO raised earth block and NO visible dirt side walls: the water surface sits lower than the surrounding lawn, soft muddy bank, natural ring of rounded stones partly sunk in the mud, grass tufts and reeds. Calm clear teal water, faint sandy bottom, NO fish. The surrounding grass forms an irregular organic border that thins out toward the edges. Soft daylight from the top-left. Isolated on pure solid white #FFFFFF background, no text.
+
+**Texture:**
+> Seamless tileable top-down orthographic texture of `<vật liệu>`, photorealistic, same color palette as the reference, even lighting, no perspective, no border, fills the entire square frame.
 
 ## Xử lý sau khi generate
-1. Khai báo key mới trong `scripts/process-assets.mjs` (`CROPS`, `FISH_STRIPS`, `PROPS`, `TEXTURES`).
-2. Chạy `node scripts/process-assets.mjs` → xóa nền, tách cột, xuất PNG vào `public/farm/{crops,fish,props,tex}/` và manifest kích thước `src/lib/{cropArt,fishArt,propArt}.json`.
-3. Kiểm tra PNG trên nền tối (ghép thử bằng sharp) để chắc không còn viền/mảng trắng.
+1. Chép ảnh vào `art-src/` đúng tên.
+2. Khai báo key trong `scripts/process-assets.mjs`: `CROPS`, `FISH_STRIPS` (`"fish-c": [5 key]`), `PROPS` hoặc `TEXTURES`.
+3. Chạy `node scripts/process-assets.mjs`. Script sẽ:
+   - Xóa nền trắng (giữ bóng mềm) và tách cột.
+   - Xuất PNG vào `public/farm/{crops,fish,props,tex}/`.
+   - Ghi kích thước vào `src/lib/{cropArt,fishArt,propArt}.json`.
+4. Kiểm tra PNG trên nền tối, không được còn viền hay mảng trắng. Ghép thử rồi mở ảnh ra xem:
+   `node -e "require('sharp')('public/farm/crops/<key>-ripe.png').flatten({background:'#1b2a1b'}).toFile('C:/Users/SHONDO/.cursor/projects/d-Game/assets/check.png')"`
+5. Nối vào game:
+   - **Cây:** thêm cây trong `prisma/seed.ts` (`iconKey` = key), chạy `npm run db:seed` hoặc thêm qua admin. Cây quả to 1 bụi/ô thì thêm key vào `SINGLE` trong `CropSprite.tsx`.
+   - **Cá:** thêm Fish trong seed với `iconKey`, `swimStyle` (một key của `STYLES` trong `FarmPond.tsx`) và `sizeScale`.
+   - **Công trình:** đặt trong `FarmScene.tsx`, kích thước lấy từ `propArt[key].size`. Có mặt nước thì đo `WATER_POLY[key]` (tọa độ 0..1 trên ảnh nguồn) trong script rồi chạy lại.
+6. Chụp màn hình game kiểm tra góc nhìn, kích thước, ánh sáng khớp cảnh. Sai thì generate lại, đừng chỉnh tay bằng CSS filter nặng.
 
-## Ví dụ prompt
-"Four photorealistic 3D corn plants in four equal columns left to right with wide gaps, slightly elevated 3/4 view, small contact shadow each. Column 1: ... Column 4: ... No soil bed, pure solid white #FFFFFF background, no text."
+## Sự cố thường gặp
+- **Hai cột dính nhau hoặc tách sai số lượng:** generate lại với "wider gaps", script mới chia đúng.
+- **Mảng trắng kẹt bên trong (bóng ngả xanh):** chỉnh `passable` trong `removeWhite`.
+  - Đừng tăng ngưỡng vùng trắng kín (`dist < 5`) lên 16: làm vậy sẽ ăn mất cánh hoa trắng (dâu).
+- **Ảnh sinh có nền xám/be:** generate lại và nhấn mạnh "pure solid white #FFFFFF background".
