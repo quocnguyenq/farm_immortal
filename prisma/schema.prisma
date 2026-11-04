@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CropStage {
+  SEED
+  SPROUT
+  GROW
+  RIPE
+}
+
+enum ProduceQuality {
+  STAR_0
+  STAR_1
+  STAR_2
+  STAR_3
+  STAR_4
+  STAR_5
+  PREMIUM
+}
+
+enum FertilizerGrade {
+  POOR
+  NORMAL
+  HIGH
+  PREMIUM
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  displayName  String
+  isAdmin      Boolean  @default(false)
+  gold         Int      @default(2000)
+  xp           Int      @default(0)
+  level        Int      @default(1)
+  energy       Int      @default(100)
+  energyMax    Int      @default(100)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  plots         PlayerPlot[]
+  seeds         PlayerSeed[]
+  inventory     InventoryItem[]
+  pond          PlayerPond?
+  fish          PlayerFish[]
+  fishInventory FishInventory[]
+}
+
+model Crop {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  description String  @default("")
+  enabled     Boolean @default(true)
+  sortOrder   Int     @default(0)
+  unlockLevel Int     @default(1)
+
+  seedPrice Int @default(20)
+  xpReward  Int @default(8)
+
+  harvestMin Int @default(1)
+  harvestMax Int @default(3)
+
+  durationSeedMs   Int
+  durationSproutMs Int
+  durationGrowMs   Int
+
+  sellStar0   Int @default(6)
+  sellStar1   Int @default(10)
+  sellStar2   Int @default(16)
+  sellStar3   Int @default(24)
+  sellStar4   Int @default(38)
+  sellStar5   Int @default(70)
+  sellPremium Int @default(350)
+
+  color     String @default("#7cb342")
+  accent    String @default("#f4d03f")
+  iconKey   String @default("leaf")
+
+  plots     PlayerPlot[]
+  seeds     PlayerSeed[]
+  inventory InventoryItem[]
+}
+
+model Fertilizer {
+  id                 String          @id @default(cuid())
+  slug               String          @unique
+  name               String
+  description        String          @default("")
+  grade              FertilizerGrade
+  timeReducePercent  Int
+  price              Int             @default(0)
+  enabled            Boolean         @default(true)
+  sortOrder          Int             @default(0)
+  plots              PlayerPlot[]
+}
+
+model QualityRate {
+  id          String          @id @default(cuid())
+  quality     ProduceQuality  @unique
+  label       String
+  chanceBps   Int
+  sortOrder   Int             @default(0)
+}
+
+model PlotUnlock {
+  plotIndex     Int     @id
+  requiredLevel Int
+  goldCost      Int
+  enabled       Boolean @default(true)
+}
+
+model GameConfig {
+  key   String @id
+  value String
+}
+
+model PlayerPlot {
+  id                    String     @id @default(cuid())
+  userId                String
+  plotIndex             Int
+  unlocked              Boolean    @default(false)
+  cropId                String?
+  plantedAt             DateTime?
+  currentStage          CropStage?
+  accumulatedMs         Int        @default(0)
+  lastProcessedAt       DateTime?
+  wateredUntil          DateTime?
+  fertilizedThisStage   Boolean    @default(false)
+  fertilizerReducePct   Int        @default(0)
+  fertilizerId          String?
+
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  crop       Crop?        @relation(fields: [cropId], references: [id])
+  fertilizer Fertilizer?  @relation(fields: [fertilizerId], references: [id])
+
+  @@unique([userId, plotIndex])
+}
+
+model PlayerSeed {
+  id       String @id @default(cuid())
+  userId   String
+  cropId   String
+  quantity Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  crop Crop @relation(fields: [cropId], references: [id])
+
+  @@unique([userId, cropId])
+}
+
+enum FishStage {
+  FRY
+  SMALL
+  ADULT
+}
+
+/// Loài cá. Sau khi trưởng thành, cá hấp thụ linh khí trong agingMaxMs để tăng tỷ lệ sao cao.
+model Fish {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  description String  @default("")
+  enabled     Boolean @default(true)
+  sortOrder   Int     @default(0)
+  unlockLevel Int     @default(1)
+  price       Int     @default(30)
+  xpReward    Int     @default(10)
+
+  durationFryMs   Int
+  durationSmallMs Int
+  agingMaxMs      Int
+
+  sellStar0   Int @default(10)
+  sellStar1   Int @default(16)
+  sellStar2   Int @default(24)
+  sellStar3   Int @default(36)
+  sellStar4   Int @default(56)
+  sellStar5   Int @default(95)
+  sellPremium Int @default(450)
+
+  iconKey   String @default("carp")
+  swimStyle String @default("wander")
+  sizeScale Float  @default(1)
+
+  playerFish PlayerFish[]
+  inventory  FishInventory[]
+}
+
+/// Cấp ao: sức chứa và điều kiện nâng cấp.
+model PondLevel {
+  level         Int @id
+  capacity      Int
+  requiredLevel Int
+  goldCost      Int
+}
+
+model PlayerPond {
+  userId String @id
+  level  Int    @default(1)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PlayerFish {
+  id       String   @id @default(cuid())
+  userId   String
+  fishId   String
+  boughtAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fish Fish @relation(fields: [fishId], references: [id])
+
+  @@index([userId])
+}
+
+model FishInventory {
+  id       String         @id @default(cuid())
+  userId   String
+  fishId   String
+  quality  ProduceQuality
+  quantity Int            @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fish Fish @relation(fields: [fishId], references: [id])
+
+  @@unique([userId, fishId, quality])
+}
+
+model InventoryItem {
+  id       String          @id @default(cuid())
+  userId   String
+  cropId   String
+  quality  ProduceQuality
+  quantity Int             @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  crop Crop @relation(fields: [cropId], references: [id])
+
+  @@unique([userId, cropId, quality])
+}

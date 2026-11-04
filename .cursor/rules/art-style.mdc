@@ -1,0 +1,30 @@
+---
+description: Phong cách và quy trình art AI-generate cho Nông Trại Tiên Duyên (3D thực tế, isometric)
+alwaysApply: true
+---
+
+# Art style — Nông Trại Tiên Duyên
+
+Mọi hình ảnh mới (cây, cá, vật nuôi, nhà, công trình, đồ trang trí, item) phải giữ đúng phong cách hiện có. Không dùng SVG cartoon hay emoji thay cho art trong cảnh game.
+
+## Phong cách bắt buộc
+- Render 3D thực tế (photorealistic), chi tiết cao, ánh sáng ban ngày mềm chiếu từ **trên-trái**.
+- Góc nhìn **isometric 3/4 cao ~30°**, cùng góc với khu ruộng (ô đất 192×108px, tỷ lệ 16:9). Công trình thấy 2 mặt trước-trái và trước-phải.
+- Khối nền (ruộng, ao, chuồng...) là **khối đất cắt** giống ao/ruộng: mặt trên có cỏ/đất, mặt trước lộ thành đất.
+- Khi gọi GenerateImage, luôn kèm ảnh mẫu: `assets/plant-rice.jpg` (style) và ảnh chụp game hoặc `assets/prop-pond.jpg` (góc nhìn).
+
+## Quy ước ảnh nguồn (lưu ở `C:/Users/SHONDO/.cursor/projects/d-Game/assets/`)
+- **Nền trắng thuần `#FFFFFF`**, không chữ, không mặt đất phụ (trừ công trình có đế cỏ).
+- Nhiều trạng thái của 1 vật → **1 dải ngang, các cột bằng nhau, khoảng trống rộng** giữa cột:
+  - Cây: `plant-{key}.jpg`, 4 cột: hạt → non → phát triển → chín, khung 16:9.
+  - Cá/vật nuôi: `fish-*.jpg`, 5 con/dải, nhìn ngang **quay đầu sang PHẢI**, không bóng.
+- Công trình đơn: `prop-{key}.jpg`.
+- Texture lát gạch: nhìn thẳng từ trên, seamless, kín khung vuông: `tex-{key}.jpg`.
+
+## Xử lý sau khi generate
+1. Khai báo key mới trong `scripts/process-assets.mjs` (`CROPS`, `FISH_STRIPS`, `PROPS`, `TEXTURES`).
+2. Chạy `node scripts/process-assets.mjs` → xóa nền, tách cột, xuất PNG vào `public/farm/{crops,fish,props,tex}/` và manifest kích thước `src/lib/{cropArt,fishArt,propArt}.json`.
+3. Kiểm tra PNG trên nền tối (ghép thử bằng sharp) để chắc không còn viền/mảng trắng.
+
+## Ví dụ prompt
+"Four photorealistic 3D corn plants in four equal columns left to right with wide gaps, slightly elevated 3/4 view, small contact shadow each. Column 1: ... Column 4: ... No soil bed, pure solid white #FFFFFF background, no text."
